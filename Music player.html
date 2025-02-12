@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Player</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.13.0/css/all.min.css">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: url('your-image.jpg') no-repeat center center fixed;
+            background-size: cover;
+        }
+
+        .flex {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .outer-wrapper {
+            width: 100%;
+            height: 100vh;
+            flex-wrap: wrap;
+        }
+
+        .music-player-wrapper {
+            width: 400px;
+            border: 5px solid #050505;
+            padding: 20px;
+            text-align: center;
+            background: rgba(34, 34, 34, 0.8);
+            color: white;
+            border-radius: 10px;
+        }
+
+        .music-info {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-around;
+            margin: 15px 0;
+        }
+
+        .controls i {
+            font-size: 30px;
+            cursor: pointer;
+        }
+
+        input[type="range"] {
+            width: 100%;
+        }
+
+        .volume-control {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .upload-wrapper {
+            margin-top: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="outer-wrapper flex">
+        <div class="music-player-wrapper">
+            <div class="music-info">No Song Selected</div>
+
+            <div class="controls">
+                <i class="fa fa-step-backward" id="prev-btn"></i>
+                <i class="fa fa-play-circle" id="play-pause-btn"></i>
+                <i class="fa fa-step-forward" id="next-btn"></i>
+            </div>
+
+            <div>
+                <span id="current-time">00:00</span>
+                <input type="range" id="progress-bar" min="0" max="100" value="0">
+                <span id="total-duration">00:00</span>
+            </div>
+
+            <!-- Volume Control -->
+            <div class="volume-control">
+                <i class="fa fa-volume-up" id="volume-icon"></i>
+                <input type="range" id="volume-slider" min="0" max="100" value="50">
+            </div>
+
+            <div class="upload-wrapper">
+                <input type="file" id="upload-music" accept="audio/*" multiple>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class Node {
+            constructor(name, path) {
+                this.name = name;
+                this.path = path;
+                this.prev = null;
+                this.next = null;
+            }
+        }
+
+        class DoublyLinkedList {
+            constructor() {
+                this.head = null;
+                this.tail = null;
+                this.current = null;
+            }
+
+            addSong(name, path) {
+                const newNode = new Node(name, path);
+                if (!this.head) {
+                    this.head = this.tail = newNode;
+                } else {
+                    this.tail.next = newNode;
+                    newNode.prev = this.tail;
+                    this.tail = newNode;
+                }
+                if (!this.current) this.current = this.head;
+            }
+
+            nextSong() {
+                if (this.current && this.current.next) {
+                    this.current = this.current.next;
+                    return this.current;
+                }
+                return null;
+            }
+
+            prevSong() {
+                if (this.current && this.current.prev) {
+                    this.current = this.current.prev;
+                    return this.current;
+                }
+                return null;
+            }
+        }
+
+        const dll = new DoublyLinkedList();
+        const playPauseBtn = document.getElementById("play-pause-btn");
+        const prevBtn = document.getElementById("prev-btn");
+        const nextBtn = document.getElementById("next-btn");
+        const progressBar = document.getElementById("progress-bar");
+        const uploadMusic = document.getElementById("upload-music");
+        const musicTitle = document.querySelector(".music-info");
+        const currentTimeDisplay = document.getElementById("current-time");
+        const totalDurationDisplay = document.getElementById("total-duration");
+        const volumeSlider = document.getElementById("volume-slider");
+        const volumeIcon = document.getElementById("volume-icon");
+
+        let audio = new Audio();
+        let isPlaying = false;
+        let lastVolume = 0.5;
+
+        function playPauseTrack() {
+            if (!audio.src) return;
+            if (audio.paused) {
+                audio.play();
+                isPlaying = true;
+                playPauseBtn.classList.replace("fa-play-circle", "fa-pause-circle");
+            } else {
+                audio.pause();
+                isPlaying = false;
+                playPauseBtn.classList.replace("fa-pause-circle", "fa-play-circle");
+            }
+        }
+
+        function loadTrack(node) {
+            if (node) {
+                audio.src = node.path;
+                musicTitle.textContent = node.name;
+                audio.play();
+                playPauseBtn.classList.replace("fa-play-circle", "fa-pause-circle");
+                isPlaying = true;
+            }
+        }
+
+        nextBtn.addEventListener("click", () => {
+            const nextSong = dll.nextSong();
+            if (nextSong) loadTrack(nextSong);
+        });
+
+        prevBtn.addEventListener("click", () => {
+            const prevSong = dll.prevSong();
+            if (prevSong) loadTrack(prevSong);
+        });
+
+        uploadMusic.addEventListener("change", (event) => {
+            const files = event.target.files;
+            for (let file of files) {
+                const url = URL.createObjectURL(file);
+                dll.addSong(file.name, url);
+            }
+
+            if (!audio.src && dll.head) {
+                loadTrack(dll.head);
+            }
+        });
+
+        audio.addEventListener("timeupdate", () => {
+            if (audio.duration) {
+                progressBar.value = (audio.currentTime / audio.duration) * 100;
+                currentTimeDisplay.textContent = formatTime(audio.currentTime);
+                totalDurationDisplay.textContent = formatTime(audio.duration);
+            }
+        });
+
+        progressBar.addEventListener("input", () => {
+            if (audio.duration) {
+                audio.currentTime = (progressBar.value / 100) * audio.duration;
+            }
+        });
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
+        }
+
+        playPauseBtn.addEventListener("click", playPauseTrack);
+
+        volumeSlider.addEventListener("input", () => {
+            audio.volume = volumeSlider.value / 100;
+            lastVolume = audio.volume;
+            updateVolumeIcon();
+        });
+
+        volumeIcon.addEventListener("click", () => {
+            if (audio.volume > 0) {
+                lastVolume = audio.volume;
+                audio.volume = 0;
+                volumeSlider.value = 0;
+            } else {
+                audio.volume = lastVolume;
+                volumeSlider.value = lastVolume * 100;
+            }
+            updateVolumeIcon();
+        });
+
+        function updateVolumeIcon() {
+            volumeIcon.classList.toggle("fa-volume-mute", audio.volume === 0);
+            volumeIcon.classList.toggle("fa-volume-up", audio.volume > 0);
+        }
+    </script>
+</body>
+</html>
